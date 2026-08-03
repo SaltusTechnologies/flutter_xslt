@@ -19,20 +19,26 @@ A new Flutter plugin project.
     'Headers/**/*.{h}'
   ]
   s.libraries = 'z', 'iconv'
-  s.vendored_libraries = [
-    'Lib/Bin/iphoneos/libxml2.a',
-    'Lib/Bin/iphoneos/libxslt.a',
-    'Lib/Bin/iphoneos/libexslt.a'
+  # XCFrameworks (device + simulator arm64 slices) instead of the original
+  # device-only vendored_libraries — a flat .a can only target one SDK at a
+  # time, which is why the upstream package couldn't run on the iOS
+  # simulator. XCFrameworks let Xcode pick the right slice automatically.
+  s.vendored_frameworks = [
+    'Lib/XCFrameworks/libxml2.xcframework',
+    'Lib/XCFrameworks/libxslt.xcframework',
+    'Lib/XCFrameworks/libexslt.xcframework'
   ]
    s.header_dir = 'flutter_xslt'
    s.private_header_files = 'Lib/Headers/**/*.h'
    s.public_header_files = 'Headers/XsltTransformer.h'
   s.dependency 'Flutter'
-  s.platform = :ios, '12.0'
+  # Doit matcher (ou dépasser) IOS_MIN utilisé par scripts/xmlxslt/build.sh
+  # pour compiler libxml2/libxslt — un mismatch produit des avertissements de
+  # linker ("built for iOS X, which is newer than...").
+  s.platform = :ios, '14.0'
 
-  # Flutter.framework does not contain a i386 slice.
   s.pod_target_xcconfig = {
-  'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
+  'DEFINES_MODULE' => 'YES',
   'CLANG_ENABLE_MODULES' => 'NO',
   'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
   'HEADER_SEARCH_PATHS'  => [

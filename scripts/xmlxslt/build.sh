@@ -23,23 +23,24 @@ WORK="$ROOT/src"
 PREFIX_BASE="$(cd "$ROOT/../.." && pwd)"
 Headers_DIR="$PREFIX_BASE/src/flutter_xslt/ios/Lib/Headers"
 BIN_OS_DIR="$PREFIX_BASE/src/flutter_xslt/ios/Lib/Bin/iphoneos"
-#BIN_OS_DIR_SIM_DIR="$PREFIX_BASE/src/flutter_xslt/ios/Lib/Bin/iphonesimulator"
+BIN_OS_DIR_SIM_DIR="$PREFIX_BASE/src/flutter_xslt/ios/Lib/Bin/iphonesimulator"
+XCFRAMEWORK_DIR="$PREFIX_BASE/src/flutter_xslt/ios/Lib/XCFrameworks"
 
-mkdir -p "$WORK" "$Headers_DIR" "$BIN_OS_DIR" #"$BIN_OS_DIR_SIM_DIR"
+mkdir -p "$WORK" "$Headers_DIR" "$BIN_OS_DIR" "$BIN_OS_DIR_SIM_DIR" "$XCFRAMEWORK_DIR"
 
 # ========= Tooling checks =========
 xcrun --version >/dev/null
 CLANG_OS="$(xcrun --sdk iphoneos -f clang)"
 CLANG_SIM="$(xcrun --sdk iphonesimulator -f clang)"
 SDK_OS="$(xcrun --sdk iphoneos --show-sdk-path)"
-#SDK_SIM="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+SDK_SIM="$(xcrun --sdk iphonesimulator --show-sdk-path)"
 
 echo "Using:"
 echo "  libxml2  : $LIBXML2_VER"
 echo "  libxslt  : $LIBXSLT_VER"
 echo "  iOS min  : $IOS_MIN"
 echo "  SDK (OS) : $SDK_OS"
-#echo "  SDK (SIM): $SDK_SIM"
+echo "  SDK (SIM): $SDK_SIM"
 echo
 
 # ========= Download sources (official GNOME mirrors) =========
@@ -127,13 +128,26 @@ popd >/dev/null
 
 # ========= Build: device (arm64) and simulator (arm64) =========
 build_sdk "iphoneos"       "$SDK_OS"  "$CLANG_OS"  "arm64" "$BIN_OS_DIR"
-#build_sdk "iphonesimulator" "$SDK_SIM" "$CLANG_SIM" "arm64" "$BIN_OS_DIR_SIM_DIR"
+build_sdk "iphonesimulator" "$SDK_SIM" "$CLANG_SIM" "arm64" "$BIN_OS_DIR_SIM_DIR"
+
+# ========= Combine device + simulator into XCFrameworks =========
+# vendored_libraries (raw .a) can only target one SDK at a time - XCFrameworks
+# let Xcode pick the right slice automatically for device vs simulator builds.
+echo "==> Creating XCFrameworks"
+for LIB in libxml2 libxslt libexslt; do
+  rm -rf "$XCFRAMEWORK_DIR/$LIB.xcframework"
+  xcodebuild -create-xcframework \
+    -library "$BIN_OS_DIR/$LIB.a" -headers "$Headers_DIR" \
+    -library "$BIN_OS_DIR_SIM_DIR/$LIB.a" -headers "$Headers_DIR" \
+    -output "$XCFRAMEWORK_DIR/$LIB.xcframework"
+done
 
 # ========= Summary =========
 echo
 echo "✅ Build complete."
 echo "Headers: $Headers_DIR"
-echo "Device libs:    $BIN_OS_DIR (libxml2.a, libxslt.a, libexslt.a)"
-#echo "Simulator libs: $BIN_OS_DIR_SIM_DIR (libxml2.a, libxslt.a, libexslt.a)"
+echo "Device libs:      $BIN_OS_DIR (libxml2.a, libxslt.a, libexslt.a)"
+echo "Simulator libs:   $BIN_OS_DIR_SIM_DIR (libxml2.a, libxslt.a, libexslt.a)"
+echo "XCFrameworks:     $XCFRAMEWORK_DIR (libxml2.xcframework, libxslt.xcframework, libexslt.xcframework)"
 echo
 
